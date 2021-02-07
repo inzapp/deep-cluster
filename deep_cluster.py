@@ -82,7 +82,7 @@ class DeepCluster(AutoEncoder):
                     __x = cv2.imread(self.train_image_paths[randrange(0, self.len_train_image_paths)], self.img_type)
                     __x = cv2.resize(__x, (self.input_shape[1], self.input_shape[0]))
                     __x = np.asarray(__x).reshape((1,) + self.input_shape) / 255.0
-                    __y = predict_on_graph(self.cae, __x)
+                    __y = predict_on_graph(self.ae, __x)
                     __x = np.asarray(__x) * 255.0
                     __x = np.clip(__x, 0, 255).astype('uint8').reshape(self.input_shape)
                     __y = np.asarray(__y) * 255.0
@@ -92,12 +92,12 @@ class DeepCluster(AutoEncoder):
                     cv2.imshow('cae', np.concatenate((__x, __y), axis=1))
                     cv2.waitKey(1)
 
-            self.cae.compile(
+            self.ae.compile(
                 optimizer=tf.keras.optimizers.Adam(lr=self.lr),
                 loss=MeanAbsoluteLogError())
-            self.cae.summary()
+            self.ae.summary()
             print(f'\ntrain on {self.len_train_image_paths} samples\n')
-            self.cae.fit(
+            self.ae.fit(
                 x=self.generator,
                 batch_size=self.batch_size,
                 epochs=self.epochs,

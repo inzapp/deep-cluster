@@ -8,7 +8,7 @@ class AutoEncoder:
         self.encoding_dim = encoding_dim
         encoder_input, encoder_output, ae_output = self.__dense_ae()
         self.encoder = tf.keras.models.Model(encoder_input, encoder_output)
-        self.cae = tf.keras.models.Model(encoder_input, ae_output)
+        self.ae = tf.keras.models.Model(encoder_input, ae_output)
 
     def __convolutional_ae(self):
         encoder_input = tf.keras.layers.Input(shape=self.input_shape)
