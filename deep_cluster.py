@@ -29,6 +29,7 @@ class DeepCluster(AutoEncoder):
             batch_size,
             num_cluster_classes,
             cluster_epsilon,
+            use_kmeans_only=False,
             pretrained_model_path='./encoder.h5'):
         super().__init__(input_shape, encoding_dim)
         self.pool = ThreadPoolExecutor(8)
@@ -41,10 +42,13 @@ class DeepCluster(AutoEncoder):
         self.batch_size = batch_size
         self.num_cluster_classes = num_cluster_classes
         self.cluster_epsilon = cluster_epsilon
-        self.img_type = cv2.IMREAD_COLOR
         self.pretrained_model_path = pretrained_model_path
+        self.use_kmeans_only = use_kmeans_only
+        self.img_type = cv2.IMREAD_COLOR
         if self.input_shape[2] == 1:
             self.img_type = cv2.IMREAD_GRAYSCALE
+        if self.use_kmeans_only:
+            self.encoding_dim = self.input_shape[0] * self.input_shape[1]
         self.generator = DeepClusterDataGenerator(
             train_image_paths=self.train_image_paths,
             input_shape=self.input_shape,
@@ -58,40 +62,41 @@ class DeepCluster(AutoEncoder):
             return model(x, training=False)
         if use_saved_model:
             if os.path.exists(self.pretrained_model_path) and os.path.isfile(self.pretrained_model_path):
-                self.encoder = tf.keras.models.load_model('encoder.h5', compile=False)
+                self.encoder = tf.keras.models.load_model(self.pretrained_model_path, compile=False)
                 self.encoding_dim = np.asarray(self.encoder.output_shape).reshape(-1)[-1]
             else:
                 print(f'pretrained model not found : [{self.pretrained_model_path}]')
+                return
         else:
-            def training_view(batch, logs):
-                global live_view_previous_time
-                cur_time = time()
-                if cur_time - live_view_previous_time > 0.5:
-                    live_view_previous_time = cur_time
-                    __x = cv2.imread(self.train_image_paths[randrange(0, self.len_train_image_paths)], self.img_type)
-                    __x = cv2.resize(__x, (self.input_shape[1], self.input_shape[0]))
-                    __x = np.asarray(__x).reshape((1,) + self.input_shape) / 255.0
-                    __y = graph_forward(self.ae, __x)
-                    __x = np.asarray(__x) * 255.0
-                    __x = np.clip(__x, 0, 255).astype('uint8').reshape(self.input_shape)
-                    __y = np.asarray(__y) * 255.0
-                    __y = np.clip(__y, 0, 255).astype('uint8').reshape(self.input_shape)
-                    __x = cv2.resize(__x, (128, 128), interpolation=cv2.INTER_LINEAR)
-                    __y = cv2.resize(__y, (128, 128), interpolation=cv2.INTER_LINEAR)
-                    cv2.imshow('cae', np.concatenate((__x, __y), axis=1))
-                    cv2.waitKey(1)
+            if not self.use_kmeans_only:
+                def training_view(batch, logs):
+                    global live_view_previous_time
+                    cur_time = time()
+                    if cur_time - live_view_previous_time > 0.5:
+                        live_view_previous_time = cur_time
+                        __x = cv2.imread(self.train_image_paths[randrange(0, self.len_train_image_paths)], self.img_type)
+                        __x = cv2.resize(__x, (self.input_shape[1], self.input_shape[0]))
+                        __x = np.asarray(__x).reshape((1,) + self.input_shape) / 255.0
+                        __y = graph_forward(self.ae, __x)
+                        __x = np.asarray(__x) * 255.0
+                        __x = np.clip(__x, 0, 255).astype('uint8').reshape(self.input_shape)
+                        __y = np.asarray(__y) * 255.0
+                        __y = np.clip(__y, 0, 255).astype('uint8').reshape(self.input_shape)
+                        __x = cv2.resize(__x, (128, 128), interpolation=cv2.INTER_LINEAR)
+                        __y = cv2.resize(__y, (128, 128), interpolation=cv2.INTER_LINEAR)
+                        cv2.imshow('cae', np.concatenate((__x, __y), axis=1))
+                        cv2.waitKey(1)
 
-            self.ae.compile(optimizer=tf.keras.optimizers.Adam(lr=self.lr), loss=tf.keras.losses.MeanSquaredError())
-            # self.ae.compile(optimizer=tf.keras.optimizers.Adam(lr=self.lr), loss=tf.keras.losses.BinaryCrossentropy())
-            self.ae.summary()
-            print(f'\ntrain on {self.len_train_image_paths} samples\n')
-            self.ae.fit(
-                x=self.generator,
-                batch_size=self.batch_size,
-                epochs=self.epochs,
-                callbacks=tf.keras.callbacks.LambdaCallback(on_batch_end=training_view))
-            self.encoder.save('encoder.h5')
-            cv2.destroyAllWindows()
+                self.ae.compile(optimizer=tf.keras.optimizers.Adam(lr=self.lr), loss=tf.keras.losses.MeanSquaredError())
+                self.ae.summary()
+                print(f'\ntrain on {self.len_train_image_paths} samples\n')
+                self.ae.fit(
+                    x=self.generator,
+                    batch_size=self.batch_size,
+                    epochs=self.epochs,
+                    callbacks=tf.keras.callbacks.LambdaCallback(on_batch_end=training_view))
+                self.encoder.save('encoder.h5')
+                cv2.destroyAllWindows()
 
         def load_x(img_path):
             __x = cv2.imread(img_path, self.img_type)
@@ -105,7 +110,10 @@ class DeepCluster(AutoEncoder):
             fs.append(self.pool.submit(load_x, self.train_image_paths[i]))
         latent_vectors = []
         for f in tqdm(fs):
-            latent_vectors.append(np.asarray(graph_forward(self.encoder, f.result())).reshape((self.encoding_dim,)))
+            if self.use_kmeans_only:
+                latent_vectors.append(np.asarray(f.result()).reshape((self.encoding_dim,)))
+            else:
+                latent_vectors.append(np.asarray(graph_forward(self.encoder, f.result())).reshape((self.encoding_dim,)))
         latent_vectors = np.asarray(latent_vectors)
 
         print('\nstart clustering. please wait...\n')
