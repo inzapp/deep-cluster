@@ -28,7 +28,8 @@ class DeepCluster(AutoEncoder):
             epochs,
             batch_size,
             num_cluster_classes,
-            cluster_epsilon):
+            cluster_epsilon,
+            pretrained_model_path='./encoder.h5'):
         super().__init__(input_shape, encoding_dim)
         self.pool = ThreadPoolExecutor(8)
         self.train_image_paths = glob(rf'{train_image_path}/**/*.jpg', recursive=True)
@@ -41,6 +42,7 @@ class DeepCluster(AutoEncoder):
         self.num_cluster_classes = num_cluster_classes
         self.cluster_epsilon = cluster_epsilon
         self.img_type = cv2.IMREAD_COLOR
+        self.pretrained_model_path = pretrained_model_path
         if self.input_shape[2] == 1:
             self.img_type = cv2.IMREAD_GRAYSCALE
         self.generator = DeepClusterDataGenerator(
@@ -55,7 +57,11 @@ class DeepCluster(AutoEncoder):
         def graph_forward(model, x):
             return model(x, training=False)
         if use_saved_model:
-            self.encoder = tf.keras.models.load_model('encoder.h5', compile=False)
+            if os.path.exists(self.pretrained_model_path) and os.path.isfile(self.pretrained_model_path):
+                self.encoder = tf.keras.models.load_model('encoder.h5', compile=False)
+                self.encoding_dim = np.asarray(self.encoder.output_shape).reshape(-1)[-1]
+            else:
+                print(f'pretrained model not found : [{self.pretrained_model_path}]')
         else:
             def training_view(batch, logs):
                 global live_view_previous_time
@@ -185,6 +191,7 @@ class DeepCluster(AutoEncoder):
                 clustered_datas[i]['class_index'] = not_confirmed_class_indexes[inc]
                 inc += 1
 
+        acc_sum = 0.0
         clustered_datas = sorted(clustered_datas, key=lambda x: x['clustered_accuracy'], reverse=True)
         print()
         for i in range(num_classes):
@@ -193,4 +200,7 @@ class DeepCluster(AutoEncoder):
             accuracy = clustered_datas[i]['clustered_accuracy']
             clustered_data_count = clustered_datas[i]['clustered_data_counts'][class_index]
             real_data_count = data_counts[class_index]
+            acc_sum += accuracy
             print(f'dir_path : {class_name:10s}, class index : {class_index:3d}, clustered data count : {clustered_data_count:6d}, real data count : {real_data_count:6d}, accuracy : {accuracy:.4f}')
+        average_accuracy = acc_sum / float(num_classes)
+        print(f'average accuracy : {average_accuracy:.4f}')
