@@ -1,4 +1,3 @@
-"""
 Copyright (c) 2022 Inzapp
 
 Permission is hereby granted, free of charge, to any person obtaining
@@ -19,19 +18,3 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-"""
-from deep_cluster import DeepCluster
-
-
-if __name__ == '__main__':
-    DeepCluster(
-        train_image_path=r'/train_data/mnist',
-        cluster_output_save_path=r'./clustered',
-        input_shape=(32, 32, 1),
-        encoding_dim=8,
-        lr=0.001,
-        epochs=20,
-        batch_size=32,
-        num_cluster_classes=10,
-        cluster_epsilon=1e-9).cluster(use_saved_model=False)
-
