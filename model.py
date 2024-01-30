@@ -21,6 +21,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 import os
+import numpy as np
 import tensorflow as tf
 
 
@@ -66,7 +67,7 @@ class Model:
         ae_d_input = tf.keras.layers.Input(shape=(self.latent_dim,))
         x = ae_d_input
         x = tf.keras.layers.Dense(
-            units=int(self.input_shape[0] * self.input_shape[1] * self.input_shape[2]),
+            units=int(np.prod(self.input_shape)),
             kernel_initializer='glorot_normal',
             activation='sigmoid')(x)
         x = tf.keras.layers.Reshape(target_shape=self.input_shape)(x)
