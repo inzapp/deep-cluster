@@ -103,7 +103,7 @@ class DeepCluster:
         loss_str += f' loss : {loss:>8.4f}'
         print(loss_str, end='')
 
-    def cluster(self, use_saved_model=False):
+    def cluster(self):
         if len(self.image_paths) == 0:
             print(f'no images found in {self.image_path}')
             exit(0)
@@ -128,7 +128,7 @@ class DeepCluster:
                     print('\ntrain end successfully')
                     break
 
-        print('\nextracting latent vector\n')
+        print('\nextracting latent vector')
         fs = []
         for i in range(len(self.image_paths)):
             fs.append(self.data_generator.pool.submit(self.data_generator.load_image, self.image_paths[i]))
@@ -143,13 +143,13 @@ class DeepCluster:
                 latent_vectors.append(np.asarray(self.graph_forward(self.ae_e, x)).reshape((self.latent_dim,)))
         latent_vectors = np.asarray(latent_vectors)
 
-        print('\nstart clustering. please wait...\n')
+        print('\nstart clustering. please wait...')
         criteria = (cv2.TERM_CRITERIA_EPS, -1, self.eps)
         sse, labels, _ = cv2.kmeans(latent_vectors, self.n_cluster, None, criteria, 100, cv2.KMEANS_RANDOM_CENTERS)
         mse = sse / float(len(self.image_paths))
         print(f'clustering success. MSE : {mse:.4f}')
 
-        print('\nsaving data\n')
+        print('\nsaving data')
         fs = []
         for i in range(len(self.image_paths)):
             fs.append(self.data_generator.pool.submit(self.data_generator.load_image, self.image_paths[i]))
@@ -167,4 +167,5 @@ class DeepCluster:
             fs.append(self.data_generator.pool.submit(sh.copy, self.image_paths[i], copy_paths[i]))
         for f in tqdm(fs):
             f.result()
+        print('\nclustering success')
 
