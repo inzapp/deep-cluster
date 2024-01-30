@@ -1,4 +1,8 @@
 """
+Authors : inzapp
+
+Github url : https://github.com/inzapp/deep-cluster
+
 Copyright (c) 2022 Inzapp
 
 Permission is hereby granted, free of charge, to any person obtaining
