@@ -22,45 +22,54 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 import cv2
 import numpy as np
-import tensorflow as tf
 
 from concurrent.futures.thread import ThreadPoolExecutor
 
 
-class DeepClusterDataGenerator(tf.keras.utils.Sequence):
-    def __init__(self, train_image_paths, input_shape, encoding_dim, batch_size, img_type):
-        self.train_image_paths = train_image_paths
+class DataGenerator:
+    def __init__(self, image_paths, input_shape, batch_size):
+        self.image_paths = image_paths
         self.input_shape = input_shape
-        self.encoding_dim = encoding_dim
         self.batch_size = batch_size
-        self.img_type = img_type
-        self.random_indexes = np.arange(len(self.train_image_paths))
+        self.img_index = 0
         self.pool = ThreadPoolExecutor(8)
-        np.random.shuffle(self.random_indexes)
+        np.random.shuffle(self.image_paths)
 
-    def __getitem__(self, index):
+    def load(self):
         batch_x = []
-        batch_y = []
-        start_index = index * self.batch_size
         fs = []
-        for i in range(start_index, start_index + self.batch_size):
-            cur_img_path = self.train_image_paths[self.random_indexes[i]]
-            fs.append(self.pool.submit(self.__load_image, cur_img_path))
+        for _ in range(self.batch_size):
+            fs.append(self.pool.submit(self.load_image, self.next_image_path()))
 
         for f in fs:
-            x = f.result()
-            x = cv2.resize(x, (self.input_shape[1], self.input_shape[0]))
-            x = np.asarray(x).reshape(self.input_shape).astype('float32') / 255.0
+            img = f.result()
+            x = self.preprocess(img)
             batch_x.append(x)
-            batch_y.append(x)
-        return np.asarray(batch_x), np.asarray(batch_y)
+        batch_x = np.asarray(batch_x).reshape((self.batch_size,) + self.input_shape).astype('float32')
+        return batch_x
 
-    def __load_image(self, image_path):
-        return cv2.imread(image_path, self.img_type)
+    def preprocess(self, img):
+        img = self.resize(img, (self.input_shape[1], self.input_shape[0]))
+        x = np.asarray(img).reshape(self.input_shape).astype('float32') / 255.0
+        return x
 
-    def __len__(self):
-        return int(np.floor(len(self.train_image_paths) / self.batch_size))
+    def resize(self, img, size):
+        interpolation = None
+        img_height, img_width = img.shape[:2]
+        if size[0] > img_width or size[1] > img_height:
+            interpolation = cv2.INTER_LINEAR
+        else:
+            interpolation = cv2.INTER_AREA
+        return cv2.resize(img, size, interpolation=interpolation)
 
-    def on_epoch_end(self):
-        np.random.shuffle(self.random_indexes)
+    def next_image_path(self):
+        path = self.image_paths[self.img_index]
+        self.img_index += 1
+        if self.img_index == len(self.image_paths):
+            self.img_index = 0
+            np.random.shuffle(self.image_paths)
+        return path
+
+    def load_image(self, image_path):
+        return cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_GRAYSCALE if self.input_shape[-1] == 1 else cv2.IMREAD_COLOR)
 

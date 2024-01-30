@@ -25,13 +25,12 @@ from deep_cluster import DeepCluster
 
 if __name__ == '__main__':
     DeepCluster(
-        train_image_path=r'/train_data/mnist',
-        cluster_output_save_path=r'./clustered',
+        image_path=r'/train_data/mnist',
+        save_path=r'result',
         input_shape=(32, 32, 1),
-        encoding_dim=8,
+        latent_dim=8,
+        n_cluster=10,
         lr=0.001,
-        epochs=20,
-        batch_size=32,
-        num_cluster_classes=10,
-        cluster_epsilon=1e-9).cluster(use_saved_model=False)
+        batch_size=64,
+        iterations=10000).cluster()
 
